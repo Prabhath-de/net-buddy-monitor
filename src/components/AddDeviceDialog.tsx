@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { useNetworkStore } from "@/lib/network-store";
-import { DeviceType } from "@/lib/mock-data";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { addDevice } from "@/lib/supabase-queries";
 import { X } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface Props {
   open: boolean;
@@ -9,17 +10,27 @@ interface Props {
 }
 
 export function AddDeviceDialog({ open, onClose }: Props) {
-  const addDevice = useNetworkStore((s) => s.addDevice);
-  const [form, setForm] = useState({ name: "", ip: "", type: "server" as DeviceType, location: "" });
+  const [form, setForm] = useState({ name: "", ip: "", type: "server" as "server" | "router" | "switch", location: "" });
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const mutation = useMutation({
+    mutationFn: addDevice,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["devices"] });
+      setForm({ name: "", ip: "", type: "server", location: "" });
+      onClose();
+      toast({ title: "Device added" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
 
   if (!open) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name || !form.ip) return;
-    addDevice(form);
-    setForm({ name: "", ip: "", type: "server", location: "" });
-    onClose();
+    mutation.mutate(form);
   };
 
   return (
@@ -34,33 +45,20 @@ export function AddDeviceDialog({ open, onClose }: Props) {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Device Name</label>
-            <input
-              type="text"
-              required
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
+            <input type="text" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
               className="mt-1 w-full px-3 py-2.5 rounded-lg bg-secondary/50 border border-border/50 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-              placeholder="Core Router 03"
-            />
+              placeholder="Core Router 03" />
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">IP Address</label>
-            <input
-              type="text"
-              required
-              value={form.ip}
-              onChange={(e) => setForm({ ...form, ip: e.target.value })}
+            <input type="text" required value={form.ip} onChange={(e) => setForm({ ...form, ip: e.target.value })}
               className="mt-1 w-full px-3 py-2.5 rounded-lg bg-secondary/50 border border-border/50 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-primary"
-              placeholder="192.168.1.100"
-            />
+              placeholder="192.168.1.100" />
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Device Type</label>
-            <select
-              value={form.type}
-              onChange={(e) => setForm({ ...form, type: e.target.value as DeviceType })}
-              className="mt-1 w-full px-3 py-2.5 rounded-lg bg-secondary/50 border border-border/50 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-            >
+            <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as any })}
+              className="mt-1 w-full px-3 py-2.5 rounded-lg bg-secondary/50 border border-border/50 text-sm focus:outline-none focus:ring-1 focus:ring-primary">
               <option value="server">Server</option>
               <option value="router">Router</option>
               <option value="switch">Switch</option>
@@ -68,19 +66,13 @@ export function AddDeviceDialog({ open, onClose }: Props) {
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Location</label>
-            <input
-              type="text"
-              value={form.location}
-              onChange={(e) => setForm({ ...form, location: e.target.value })}
+            <input type="text" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })}
               className="mt-1 w-full px-3 py-2.5 rounded-lg bg-secondary/50 border border-border/50 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-              placeholder="DC-East Rack A"
-            />
+              placeholder="DC-East Rack A" />
           </div>
-          <button
-            type="submit"
-            className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
-          >
-            Add Device
+          <button type="submit" disabled={mutation.isPending}
+            className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50">
+            {mutation.isPending ? "Adding..." : "Add Device"}
           </button>
         </form>
       </div>

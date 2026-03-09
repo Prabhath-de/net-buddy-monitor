@@ -1,9 +1,12 @@
-import { useNetworkStore } from "@/lib/network-store";
+import { useQuery } from "@tanstack/react-query";
+import { fetchAlerts, markAlertRead } from "@/lib/supabase-queries";
 import { AlertCircle, AlertTriangle, Info, CheckCircle } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function AlertsPage() {
-  const { alerts, markAlertRead } = useNetworkStore();
+  const { data: alerts = [] } = useQuery({ queryKey: ["alerts"], queryFn: fetchAlerts, refetchInterval: 30000 });
+  const queryClient = useQueryClient();
 
   const severityConfig = {
     critical: { icon: AlertCircle, color: "text-destructive", bg: "bg-destructive/10", border: "border-destructive/30" },
@@ -13,13 +16,16 @@ export default function AlertsPage() {
 
   const unread = alerts.filter(a => !a.read).length;
 
+  const handleMarkRead = async (id: string) => {
+    await markAlertRead(id);
+    queryClient.invalidateQueries({ queryKey: ["alerts"] });
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-glow">Alerts</h1>
-          <p className="text-sm text-muted-foreground mt-1">{unread} unread alert{unread !== 1 ? "s" : ""}</p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold text-glow">Alerts</h1>
+        <p className="text-sm text-muted-foreground mt-1">{unread} unread alert{unread !== 1 ? "s" : ""}</p>
       </div>
 
       <div className="space-y-2">
@@ -35,7 +41,7 @@ export default function AlertsPage() {
           return (
             <button
               key={alert.id}
-              onClick={() => markAlertRead(alert.id)}
+              onClick={() => handleMarkRead(alert.id)}
               className={`w-full text-left glass-card rounded-xl p-4 border ${
                 alert.read ? "border-border/30 opacity-50" : config.border
               } hover:bg-secondary/30 transition-all`}
@@ -50,7 +56,7 @@ export default function AlertsPage() {
                     {!alert.read && <span className="w-2 h-2 rounded-full bg-primary shrink-0" />}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {alert.deviceName} · {formatDistanceToNow(alert.timestamp, { addSuffix: true })}
+                    {formatDistanceToNow(new Date(alert.created_at), { addSuffix: true })}
                   </p>
                 </div>
                 <span className={`text-[10px] uppercase font-semibold tracking-wider ${config.color}`}>

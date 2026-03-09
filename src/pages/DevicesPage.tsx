@@ -1,19 +1,38 @@
 import { useState } from "react";
-import { useNetworkStore } from "@/lib/network-store";
-import { Search, Plus, Trash2, Edit2, Server, Router, Network } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { fetchDevices, deleteDevice } from "@/lib/supabase-queries";
+import { Search, Plus, Trash2, Server, Router, Network } from "lucide-react";
 import { AddDeviceDialog } from "@/components/AddDeviceDialog";
-import { Device } from "@/lib/mock-data";
+import { useToast } from "@/hooks/use-toast";
 
-const typeIcons = {
-  server: Server,
-  router: Router,
-  switch: Network,
-};
+const typeIcons = { server: Server, router: Router, switch: Network };
 
 export default function DevicesPage() {
-  const { filteredDevices, searchQuery, setSearchQuery, typeFilter, setTypeFilter, deleteDevice } = useNetworkStore();
   const [showAdd, setShowAdd] = useState(false);
-  const devices = filteredDevices();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: allDevices = [] } = useQuery({ queryKey: ["devices"], queryFn: fetchDevices, refetchInterval: 30000 });
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteDevice,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["devices"] });
+      queryClient.invalidateQueries({ queryKey: ["alerts"] });
+      toast({ title: "Device deleted" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const devices = allDevices.filter((d) => {
+    const matchesSearch = !searchQuery ||
+      d.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      d.ip.includes(searchQuery);
+    const matchesType = typeFilter === "all" || d.type === typeFilter;
+    return matchesSearch && matchesType;
+  });
 
   return (
     <div className="space-y-6">
@@ -63,8 +82,6 @@ export default function DevicesPage() {
                 <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden md:table-cell">IP Address</th>
                 <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden lg:table-cell">Type</th>
                 <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden lg:table-cell">Location</th>
-                <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden sm:table-cell">Latency</th>
-                <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden sm:table-cell">Bandwidth</th>
                 <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
@@ -85,15 +102,9 @@ export default function DevicesPage() {
                     <td className="px-5 py-3 hidden md:table-cell font-mono text-muted-foreground">{device.ip}</td>
                     <td className="px-5 py-3 hidden lg:table-cell capitalize text-muted-foreground">{device.type}</td>
                     <td className="px-5 py-3 hidden lg:table-cell text-muted-foreground">{device.location}</td>
-                    <td className="px-5 py-3 hidden sm:table-cell font-mono">
-                      {device.status === "online" ? `${device.latency}ms` : "—"}
-                    </td>
-                    <td className="px-5 py-3 hidden sm:table-cell font-mono text-xs">
-                      {device.status === "online" ? `↓${device.bandwidthIn} ↑${device.bandwidthOut}` : "—"}
-                    </td>
                     <td className="px-5 py-3">
                       <button
-                        onClick={() => deleteDevice(device.id)}
+                        onClick={() => deleteMutation.mutate(device.id)}
                         className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -104,7 +115,9 @@ export default function DevicesPage() {
               })}
               {devices.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-5 py-10 text-center text-muted-foreground">No devices found</td>
+                  <td colSpan={6} className="px-5 py-10 text-center text-muted-foreground">
+                    {allDevices.length === 0 ? "No devices yet. Add your first device!" : "No devices match your search."}
+                  </td>
                 </tr>
               )}
             </tbody>
