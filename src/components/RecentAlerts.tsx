@@ -1,16 +1,24 @@
-import { useNetworkStore } from "@/lib/network-store";
+import type { Database } from "@/integrations/supabase/types";
 import { AlertTriangle, AlertCircle, Info } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { markAlertRead } from "@/lib/supabase-queries";
+import { useQueryClient } from "@tanstack/react-query";
 
-export function RecentAlerts() {
-  const alerts = useNetworkStore((s) => s.alerts);
-  const markAlertRead = useNetworkStore((s) => s.markAlertRead);
+type AlertRow = Database["public"]["Tables"]["alerts"]["Row"];
+
+export function RecentAlerts({ alerts }: { alerts: AlertRow[] }) {
+  const queryClient = useQueryClient();
   const recent = alerts.slice(0, 8);
 
   const severityIcon = {
     critical: <AlertCircle className="w-4 h-4 text-destructive" />,
     warning: <AlertTriangle className="w-4 h-4 text-warning" />,
     info: <Info className="w-4 h-4 text-primary" />,
+  };
+
+  const handleMarkRead = async (id: string) => {
+    await markAlertRead(id);
+    queryClient.invalidateQueries({ queryKey: ["alerts"] });
   };
 
   return (
@@ -23,11 +31,9 @@ export function RecentAlerts() {
         {recent.map((alert) => (
           <button
             key={alert.id}
-            onClick={() => markAlertRead(alert.id)}
+            onClick={() => handleMarkRead(alert.id)}
             className={`w-full text-left p-3 rounded-lg border transition-all text-sm ${
-              alert.read
-                ? "border-border/30 bg-transparent opacity-60"
-                : "border-border/50 bg-secondary/30"
+              alert.read ? "border-border/30 bg-transparent opacity-60" : "border-border/50 bg-secondary/30"
             } hover:bg-secondary/50`}
           >
             <div className="flex items-start gap-2">
@@ -35,7 +41,7 @@ export function RecentAlerts() {
               <div className="flex-1 min-w-0">
                 <p className="truncate font-medium text-xs">{alert.message}</p>
                 <p className="text-[10px] text-muted-foreground mt-0.5">
-                  {formatDistanceToNow(alert.timestamp, { addSuffix: true })}
+                  {formatDistanceToNow(new Date(alert.created_at), { addSuffix: true })}
                 </p>
               </div>
               {!alert.read && <span className="w-2 h-2 rounded-full bg-primary mt-1 shrink-0" />}

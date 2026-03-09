@@ -1,6 +1,8 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, Server, Bell, Settings, Activity } from "lucide-react";
-import { useNetworkStore } from "@/lib/network-store";
+import { LayoutDashboard, Server, Bell, Activity, LogOut } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { fetchAlerts } from "@/lib/supabase-queries";
+import { useAuth } from "@/contexts/AuthContext";
 
 const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
@@ -11,7 +13,8 @@ const navItems = [
 
 export function AppSidebar() {
   const location = useLocation();
-  const alerts = useNetworkStore((s) => s.alerts);
+  const { signOut, user } = useAuth();
+  const { data: alerts = [] } = useQuery({ queryKey: ["alerts"], queryFn: fetchAlerts, refetchInterval: 30000 });
   const unreadCount = alerts.filter((a) => !a.read).length;
 
   return (
@@ -50,6 +53,18 @@ export function AppSidebar() {
           );
         })}
       </nav>
+      <div className="p-2 border-t border-border/50">
+        <div className="hidden lg:block px-3 py-1 mb-1">
+          <p className="text-[10px] text-muted-foreground truncate">{user?.email}</p>
+        </div>
+        <button
+          onClick={signOut}
+          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all w-full"
+        >
+          <LogOut className="w-5 h-5 shrink-0" />
+          <span className="hidden lg:block">Sign Out</span>
+        </button>
+      </div>
     </aside>
   );
 }

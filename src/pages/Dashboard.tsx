@@ -1,4 +1,5 @@
-import { useNetworkStore } from "@/lib/network-store";
+import { useQuery } from "@tanstack/react-query";
+import { fetchDevices, fetchAlerts } from "@/lib/supabase-queries";
 import { StatCard } from "@/components/StatCard";
 import { BandwidthChart } from "@/components/BandwidthChart";
 import { LatencyChart } from "@/components/LatencyChart";
@@ -6,15 +7,10 @@ import { UptimeChart } from "@/components/UptimeChart";
 import { RecentAlerts } from "@/components/RecentAlerts";
 import { DeviceStatusGrid } from "@/components/DeviceStatusGrid";
 import { Server, Wifi, WifiOff, Bell } from "lucide-react";
-import { useEffect } from "react";
 
 export default function Dashboard() {
-  const { devices, alerts, refreshMonitoring } = useNetworkStore();
-
-  useEffect(() => {
-    const interval = setInterval(refreshMonitoring, 30000);
-    return () => clearInterval(interval);
-  }, [refreshMonitoring]);
+  const { data: devices = [] } = useQuery({ queryKey: ["devices"], queryFn: fetchDevices, refetchInterval: 30000 });
+  const { data: alerts = [] } = useQuery({ queryKey: ["alerts"], queryFn: fetchAlerts, refetchInterval: 30000 });
 
   const online = devices.filter((d) => d.status === "online").length;
   const offline = devices.filter((d) => d.status === "offline").length;
@@ -41,9 +37,9 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
-          <DeviceStatusGrid />
+          <DeviceStatusGrid devices={devices} />
         </div>
-        <RecentAlerts />
+        <RecentAlerts alerts={alerts} />
       </div>
 
       <UptimeChart />
