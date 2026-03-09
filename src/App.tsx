@@ -10,6 +10,8 @@ import DevicesPage from "./pages/DevicesPage";
 import MonitoringPage from "./pages/MonitoringPage";
 import AlertsPage from "./pages/AlertsPage";
 import AuthPage from "./pages/AuthPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
