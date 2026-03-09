@@ -14,16 +14,125 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      alerts: {
+        Row: {
+          created_at: string
+          device_id: string
+          id: string
+          message: string
+          read: boolean
+          severity: Database["public"]["Enums"]["alert_severity"]
+        }
+        Insert: {
+          created_at?: string
+          device_id: string
+          id?: string
+          message: string
+          read?: boolean
+          severity?: Database["public"]["Enums"]["alert_severity"]
+        }
+        Update: {
+          created_at?: string
+          device_id?: string
+          id?: string
+          message?: string
+          read?: boolean
+          severity?: Database["public"]["Enums"]["alert_severity"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alerts_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "devices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      devices: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          ip: string
+          location: string | null
+          name: string
+          status: string
+          type: Database["public"]["Enums"]["device_type"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          ip: string
+          location?: string | null
+          name: string
+          status?: string
+          type?: Database["public"]["Enums"]["device_type"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          ip?: string
+          location?: string | null
+          name?: string
+          status?: string
+          type?: Database["public"]["Enums"]["device_type"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      monitoring_metrics: {
+        Row: {
+          bandwidth_in: number | null
+          bandwidth_out: number | null
+          device_id: string
+          id: string
+          latency: number | null
+          recorded_at: string
+          status: string
+        }
+        Insert: {
+          bandwidth_in?: number | null
+          bandwidth_out?: number | null
+          device_id: string
+          id?: string
+          latency?: number | null
+          recorded_at?: string
+          status?: string
+        }
+        Update: {
+          bandwidth_in?: number | null
+          bandwidth_out?: number | null
+          device_id?: string
+          id?: string
+          latency?: number | null
+          recorded_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "monitoring_metrics_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "devices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_device_owner: { Args: { _device_id: string }; Returns: boolean }
     }
     Enums: {
-      [_ in never]: never
+      alert_severity: "critical" | "warning" | "info"
+      device_type: "server" | "router" | "switch"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +259,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      alert_severity: ["critical", "warning", "info"],
+      device_type: ["server", "router", "switch"],
+    },
   },
 } as const
