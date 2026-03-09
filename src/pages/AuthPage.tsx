@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Activity } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -84,6 +85,14 @@ export default function AuthPage() {
             {loading ? "Loading..." : isLogin ? "Sign In" : "Sign Up"}
           </button>
         </form>
+
+        {isLogin && (
+          <div className="text-center mt-3">
+            <Link to="/forgot-password" className="text-xs text-muted-foreground hover:text-primary transition-colors">
+              Forgot password?
+            </Link>
+          </div>
+        )}
 
         <p className="text-sm text-center text-muted-foreground mt-4">
           {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
