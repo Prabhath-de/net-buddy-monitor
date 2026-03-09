@@ -15,9 +15,11 @@ A modern, real-time network monitoring dashboard built with React and Lovable Cl
 - Filter by device type
 
 ### Real-Time Monitoring
-- Automatic device status checks every 30 seconds
+- **Automated health checks** every minute via edge function
+- HTTP ping to verify device availability
 - Green/red status indicators for online/offline devices
 - Live dashboard with device status grid
+- Stores latency and bandwidth metrics in database
 
 ### Bandwidth Monitoring
 - 24-hour bandwidth usage charts (inbound/outbound)
@@ -27,9 +29,11 @@ A modern, real-time network monitoring dashboard built with React and Lovable Cl
 ### Latency Monitoring
 - 30-minute latency trend charts
 - Average latency calculations across all devices
+- Response time measured during health checks
 
 ### Alert System
-- Automatic alerts when devices go offline
+- **Automatic critical alerts** when devices go offline
+- **Info alerts** when devices come back online
 - Severity levels: Critical, Warning, Info
 - Mark alerts as read
 - Unread alert badge in sidebar navigation
@@ -42,8 +46,10 @@ A modern, real-time network monitoring dashboard built with React and Lovable Cl
 
 ### Authentication
 - Secure admin login with email/password
+- **Password reset flow** — forgot password + reset via email link
 - Protected routes — only authenticated users can access the dashboard
 - Row Level Security — users only see their own devices
+- Session persistence with auto-refresh tokens
 
 ---
 
@@ -58,7 +64,28 @@ A modern, real-time network monitoring dashboard built with React and Lovable Cl
 | Backend        | Lovable Cloud (Supabase)                |
 | Database       | PostgreSQL                              |
 | Authentication | Supabase Auth                           |
+| Edge Functions | Deno (device monitoring)                |
+| Scheduling     | pg_cron (automated checks)              |
 | Animations     | Framer Motion                           |
+
+---
+
+## Edge Functions
+
+### `monitor-devices`
+Automated device health check function that runs every minute via pg_cron.
+
+**What it does:**
+1. Fetches all devices from the database
+2. Performs HTTP HEAD request to each device IP
+3. Measures response time (latency)
+4. Updates device status (online/offline)
+5. Stores metrics in `monitoring_metrics` table
+6. Creates alerts on status changes
+
+**Endpoint:** `POST /functions/v1/monitor-devices`
+
+**Note:** Devices must be publicly accessible via HTTP for health checks to work. Internal IPs (192.168.x.x, 10.x.x.x) are not reachable from edge functions.
 
 ---
 
@@ -69,7 +96,7 @@ A modern, real-time network monitoring dashboard built with React and Lovable Cl
 |-------------|---------------|---------------------------------|
 | `id`        | UUID (PK)     | Unique device identifier        |
 | `name`      | TEXT          | Device name                     |
-| `ip`        | TEXT          | IP address                      |
+| `ip`        | TEXT          | IP address or hostname          |
 | `type`      | ENUM          | `server`, `router`, `switch`    |
 | `location`  | TEXT          | Physical location               |
 | `status`    | TEXT          | `online` or `offline`           |
@@ -100,12 +127,34 @@ A modern, real-time network monitoring dashboard built with React and Lovable Cl
 
 ---
 
+## Database Functions
+
+### `is_device_owner(device_id UUID)`
+Security helper function that checks if the current authenticated user owns a specific device. Used in RLS policies to prevent cross-user data access.
+
+### `update_updated_at_column()`
+Trigger function that automatically updates the `updated_at` timestamp when a device record is modified.
+
+---
+
+## Cron Jobs
+
+| Job Name                    | Schedule    | Description                          |
+|-----------------------------|-------------|--------------------------------------|
+| `monitor-devices-every-minute` | `* * * * *` | Calls monitor-devices edge function |
+
+Powered by `pg_cron` and `pg_net` extensions.
+
+---
+
 ## Security
 
 - **Row Level Security (RLS)** enabled on all tables
 - Users can only access their own devices, metrics, and alerts
 - `is_device_owner()` helper function prevents cross-user data access
 - All API calls require authentication
+- Edge function uses service role for cross-user device monitoring
+- Passwords handled securely via Supabase Auth
 
 ---
 
@@ -134,9 +183,18 @@ src/
 │   ├── AuthPage.tsx           # Login/signup page
 │   ├── Dashboard.tsx          # Main dashboard
 │   ├── DevicesPage.tsx        # Device inventory page
+│   ├── ForgotPasswordPage.tsx # Password reset request
+│   ├── ResetPasswordPage.tsx  # Set new password
 │   └── MonitoringPage.tsx     # Monitoring metrics page
 └── integrations/
     └── supabase/              # Auto-generated types & client
+
+supabase/
+├── config.toml                # Supabase project config
+└── functions/
+    └── monitor-devices/       # Device health check function
+        ├── deno.json
+        └── index.ts
 ```
 
 ---
@@ -148,10 +206,20 @@ src/
 3. **Monitor** — View real-time status on the Dashboard
 4. **Alerts** — Check the Alerts page for notifications
 
+### Adding a Device for Monitoring
+
+For the automated health checks to work, devices must be accessible via HTTP:
+
+```
+✅ Works: google.com, api.example.com, 203.0.113.50 (public IP)
+❌ Won't work: 192.168.1.1, 10.0.0.1 (private IPs)
+```
+
 ---
 
 ## REST API Endpoints (via Supabase)
 
+### Database Tables
 | Method   | Endpoint              | Description            |
 |----------|-----------------------|------------------------|
 | `GET`    | `/devices`            | List user's devices    |
@@ -162,28 +230,55 @@ src/
 | `GET`    | `/alerts`             | List alerts            |
 | `PATCH`  | `/alerts/:id`         | Mark alert as read     |
 
+### Edge Functions
+| Method   | Endpoint                        | Description                    |
+|----------|---------------------------------|--------------------------------|
+| `POST`   | `/functions/v1/monitor-devices` | Trigger device health checks   |
+
+---
+
+## Authentication Routes
+
+| Route              | Description                           |
+|--------------------|---------------------------------------|
+| `/auth`            | Login / Sign up page                  |
+| `/forgot-password` | Request password reset email          |
+| `/reset-password`  | Set new password (from email link)    |
+
 ---
 
 ## Design
 
 - **Theme**: Dark NOC (Network Operations Center) style
 - **Font**: Space Grotesk (display) + JetBrains Mono (data)
-- **Accent**: Cyan primary with green/red status indicators
+- **Accent**: Cyan (#06b6d4) primary with green/red status indicators
 - **Effects**: Glassmorphism cards, glow effects, grid background
 - **Responsive**: Mobile-friendly with collapsible sidebar
 
 ---
 
+## Environment Variables
+
+The following are automatically configured by Lovable Cloud:
+
+| Variable                      | Description                    |
+|-------------------------------|--------------------------------|
+| `VITE_SUPABASE_URL`          | Supabase project URL           |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Supabase anon/public key    |
+| `SUPABASE_SERVICE_ROLE_KEY`  | Service role key (edge functions) |
+
+---
+
 ## Future Enhancements
 
-- [ ] Real ICMP ping monitoring via edge functions
 - [ ] SNMP bandwidth collection
 - [ ] Email alert notifications
 - [ ] Device detail pages with individual metrics
-- [ ] Password reset flow
-- [ ] Admin role management
-- [ ] Export monitoring reports
+- [ ] Network topology map
 - [ ] Custom alert thresholds
+- [ ] Admin role management
+- [ ] Export monitoring reports (CSV/PDF)
+- [ ] Dashboard widget customization
 
 ---
 
